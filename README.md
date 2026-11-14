@@ -23,7 +23,8 @@ Set the following environment variables in the Vercel project instead of committ
 
 Vercel uses its writable `/tmp` directory for runtime caches. That cache is ephemeral, so a cold
 serverless instance can take longer to load its first SPHEREx frame. The browser never receives
-the Gemini key.
+the Gemini key. Store `GEMINI_API_KEY` as a Vercel **Secret** environment variable; never commit
+the key or a local `.env` file to GitHub.
 
 ### Enable AI Change Analysis
 
