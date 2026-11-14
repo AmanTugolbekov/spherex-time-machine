@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 from scipy.ndimage import gaussian_filter, label, map_coordinates, maximum_filter, median_filter
 
 ROOT = Path(__file__).resolve().parent.parent
+PRESET_FRAMES = ROOT / "server" / "preset_frames.json"
 if os.getenv("VERCEL"):
     CACHE = Path(tempfile.gettempdir()) / "spherex-cache"
 else:
@@ -55,6 +56,7 @@ DETECTORS = {
 
 app = FastAPI(title="SPHEREx Time Machine")
 _local = threading.local()
+_preset_frames = None
 
 
 def session():
@@ -68,6 +70,17 @@ def cache_path(kind, key, ext):
     d = CACHE / kind
     d.mkdir(exist_ok=True)
     return d / f"{h}.{ext}"
+
+
+def preset_frames():
+    """Packaged NASA metadata for the demo targets when IRSA blocks a cloud host."""
+    global _preset_frames
+    if _preset_frames is None:
+        try:
+            _preset_frames = json.loads(PRESET_FRAMES.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            _preset_frames = {}
+    return _preset_frames
 
 
 # ---------------------------------------------------------------- search
@@ -99,10 +112,17 @@ def frames(ra: float, dec: float):
 
     # The CAOM plane table has the footprint polygon, so one spatial query + join returns
     # metadata and file paths together (~6 s, vs. obscore + per-ID lookups at 30 s+)
-    obs = tap(f"""SELECT p.obs_publisher_did, p.energy_bandpassname, p.time_bounds_lower,
+    try:
+        obs = tap(f"""SELECT p.obs_publisher_did, p.energy_bandpassname, p.time_bounds_lower,
 p.energy_bounds_lower, p.energy_bounds_upper, a.uri
 FROM spherex.plane p JOIN spherex.artifact a ON a.planeid = p.planeid
 WHERE a.producttype = 'science' AND CONTAINS(POINT('ICRS', {ra}, {dec}), p.poly) = 1""")
+    except HTTPException:
+        fallback = preset_frames().get(key)
+        if fallback is None:
+            raise
+        cp.write_text(json.dumps(fallback), encoding="utf-8")
+        return JSONResponse(fallback)
 
     rows = []
     for x in obs:
