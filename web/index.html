@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPHEREx Time Machine</title>
+<meta name="description" content="Explore NASA SPHEREx all-sky infrared images and see how the sky changes over time.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%233ddc97' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%233ddc97'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="4" fill="currentColor"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5" stroke="currentColor" stroke-width="2"/></svg>
+    <div>
+      <h1>SPHEREx Time Machine</h1>
+      <p>See how the infrared sky changes, every six months</p>
+    </div>
+  </div>
+  <form id="search" class="search" autocomplete="off">
+    <input id="q" type="text" placeholder="Object name or RA Dec (e.g. M42, 83.82 -5.39)" aria-label="Search the sky">
+    <button type="submit">Go</button>
+  </form>
+  <button id="helpBtn" class="ghost" type="button">How it works</button>
+</header>
+
+<nav class="presets" id="presets" aria-label="Interesting places"></nav>
+
+<main class="layout">
+  <section class="panel sky">
+    <div class="panel-head">
+      <h2>1 · Pick a spot on the sky</h2>
+      <select id="survey" aria-label="Background survey">
+        <option value="https://irsa.ipac.caltech.edu/data/hips/CDS/2MASS/Color">2MASS (near-IR)</option>
+        <option value="https://irsa.ipac.caltech.edu/data/hips/CDS/AllWISE/RGB-W4-W2-W1">WISE (mid-IR)</option>
+        <option value="https://irsa.ipac.caltech.edu/data/hips/CDS/DSS2/color">DSS (visible)</option>
+      </select>
+    </div>
+    <div id="aladin"></div>
+    <div class="sky-foot">
+      <span>Click anywhere on the map, then press</span>
+      <button id="loadHere" class="primary" type="button">Load SPHEREx images here</button>
+    </div>
+  </section>
+
+  <section class="panel viewer">
+    <div class="panel-head">
+      <h2>2 · Watch it change</h2>
+      <span id="target" class="mono muted">No target yet</span>
+    </div>
+
+    <div id="status" class="status">Choose a place on the map or one of the suggestions above.</div>
+
+    <div id="controls" class="controls" hidden>
+      <div class="row">
+        <label class="lbl">Wavelength</label>
+        <div id="dets" class="seg"></div>
+      </div>
+      <div class="row">
+        <label class="lbl">Timeline</label>
+        <div id="timeline" class="timeline"></div>
+      </div>
+      <div class="row ab">
+        <div><span class="tag a">A</span><select id="selA"></select></div>
+        <div><span class="tag b">B</span><select id="selB"></select><button id="matchB" class="ghost mini" type="button" title="Pick the B exposure that saw the same wavelength as A">Match color</button></div>
+      </div>
+      <div class="row">
+        <label class="lbl">Mode</label>
+        <div class="seg" id="modes">
+          <button data-mode="blink" class="on">Blink</button>
+          <button data-mode="swipe">Swipe</button>
+          <button data-mode="diff">Difference</button>
+          <button data-mode="movie">Movie</button>
+          <button data-mode="side">Side by side</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="stage" class="stage" hidden>
+      <div id="frames" class="frames">
+        <div class="frame" id="fA"><img alt="Frame A"><canvas class="ovl"></canvas><span class="cap"></span></div>
+        <div class="frame" id="fB"><img alt="Frame B"><canvas class="ovl"></canvas><span class="cap"></span></div>
+        <input id="swipe" type="range" min="0" max="100" value="50" aria-label="Swipe position" hidden>
+      </div>
+      <div class="stage-foot">
+        <label class="chk"><input type="checkbox" id="showSSO"> Mark known asteroids &amp; comets</label>
+        <label class="chk"><input type="checkbox" id="showGrid" checked> Crosshair</label>
+        <label class="speed">Speed <input id="speed" type="range" min="150" max="1500" value="600" step="50"></label>
+        <label class="speed">Field <select id="fov"><option value="6">6′</option><option value="12" selected>12′</option><option value="24">24′</option></select></label>
+      </div>
+      <p id="legend" class="legend"></p>
+    </div>
+
+    <section id="aiPanel" class="ai-panel" hidden aria-live="polite">
+      <div class="ai-head">
+        <div>
+          <h3>AI Change Analysis</h3>
+          <p>Gemini reviews frames A, B, the difference image, and measured signal statistics.</p>
+        </div>
+        <button id="analyzeAI" class="primary" type="button">Analyze with AI</button>
+      </div>
+      <div id="aiEmpty" class="ai-empty">Choose two frames, preferably at the same wavelength, then run the analysis.</div>
+      <div id="aiBusy" class="ai-empty busy" hidden>Preparing images and asking Gemini…</div>
+      <div id="aiResult" hidden>
+        <div class="ai-verdict">
+          <span id="aiClass" class="ai-badge"></span>
+          <span id="aiConfidence" class="mono"></span>
+        </div>
+        <p id="aiSummary" class="ai-summary"></p>
+        <div class="ai-columns">
+          <div><h4>Evidence</h4><ul id="aiEvidence"></ul></div>
+          <div><h4>Limitations</h4><ul id="aiLimits"></ul></div>
+          <div><h4>Next steps</h4><ul id="aiNext"></ul></div>
+        </div>
+        <p id="aiDisclaimer" class="ai-disclaimer"></p>
+      </div>
+    </section>
+  </section>
+</main>
+
+<dialog id="help">
+  <h2>How it works</h2>
+  <p><b>SPHEREx</b> is a NASA space telescope launched in 2025. Every six months it maps the entire sky in 102 colors of near-infrared light, from 0.75 to 5 µm. Each place on the sky therefore gets photographed again and again.</p>
+  <p>This tool fetches every SPHEREx exposure that covers the spot you pick and lines them up pixel by pixel. Things that stay put (most stars and galaxies) look identical. Things that <b>move</b> or <b>change brightness</b> jump out:</p>
+  <ul>
+    <li><b>Blink</b> flips between two images. Your eye spots anything that jumps. Clyde Tombaugh found Pluto this way in 1930.</li>
+    <li><b>Swipe</b> drags a curtain between the two.</li>
+    <li><b>Difference</b> subtracts A from B. Steady objects cancel out. <span class="sw b"></span>green is brighter in B, <span class="sw a"></span>blue is brighter in A. An asteroid shows up as a blue–green pair.</li>
+    <li><b>Movie</b> plays one exposure from each six-month sky survey.</li>
+  </ul>
+  <p>The six <b>wavelength</b> buttons are SPHEREx's six detectors. Shorter wavelengths see starlight. Longer ones see warm dust, ices and cool brown dwarfs.</p>
+  <p class="muted small">Data: SPHEREx Quick Release, NASA/IPAC Infrared Science Archive (IRSA). Known small bodies: JPL Small-Body Identification API. Background maps: CDS Aladin Lite / HiPS.</p>
+  <form method="dialog"><button class="primary">Got it</button></form>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
