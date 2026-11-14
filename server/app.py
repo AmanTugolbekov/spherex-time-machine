@@ -73,7 +73,17 @@ def cache_path(kind, key, ext):
 # ---------------------------------------------------------------- search
 
 def tap(query):
-    r = session().post(TAP, data={"QUERY": query, "FORMAT": "csv"}, timeout=180)
+    params = {
+        "REQUEST": "doQuery",
+        "LANG": "ADQL",
+        "QUERY": query,
+        "FORMAT": "csv",
+    }
+    headers = {
+        "Accept": "text/csv",
+        "User-Agent": "SPHEREx-Time-Machine/1.0 (+https://github.com/AmanTugolbekov/spherex-time-machine)",
+    }
+    r = session().get(TAP, params=params, headers=headers, timeout=180)
     if r.status_code != 200 or r.text.lstrip().startswith("<"):
         raise HTTPException(502, "IRSA TAP query failed")
     return list(csv.DictReader(io.StringIO(r.text)))
