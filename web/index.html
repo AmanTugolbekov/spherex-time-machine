@@ -26,7 +26,19 @@
   <button id="helpBtn" class="ghost" type="button">How it works</button>
 </header>
 
-<nav class="presets" id="presets" aria-label="Interesting places"></nav>
+<section class="coverage-note" aria-labelledby="coverage-title">
+  <span class="coverage-badge">MVP demo mode</span>
+  <div>
+    <h2 id="coverage-title">7 verified SPHEREx regions are ready to explore</h2>
+    <p>The full-sky map is available for orientation, but live NASA/IPAC searches can time out on demo hosting. Choose a verified target below for a fast, reliable presentation.</p>
+  </div>
+</section>
+
+<div class="preset-head">
+  <strong>Verified demo targets</strong>
+  <span>Click a target to move the map and load its NASA observations automatically.</span>
+</div>
+<nav class="presets" id="presets" aria-label="Verified demo targets"></nav>
 
 <main class="layout">
   <section class="panel sky">
@@ -40,8 +52,8 @@
     </div>
     <div id="aladin"></div>
     <div class="sky-foot">
-      <span>Click anywhere on the map, then press</span>
-      <button id="loadHere" class="primary" type="button">Load SPHEREx images here</button>
+      <span id="mapHint">Map clicks preview a position. Verified targets provide guaranteed demo data.</span>
+      <button id="loadHere" class="primary" type="button">Open nearest verified target</button>
     </div>
   </section>
 
@@ -138,3 +150,4 @@
 <script type="module" src="app.js"></script>
 </body>
 </html>
+
