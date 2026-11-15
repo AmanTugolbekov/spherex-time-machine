@@ -110,6 +110,15 @@ def frames(ra: float, dec: float):
     if cp.exists():
         return JSONResponse(json.loads(cp.read_text()))
 
+    # Vercel cannot reliably reach IRSA TAP and has a shorter request ceiling than TAP's
+    # worst-case response time. Keep the public demo instant for the documented presets;
+    # arbitrary coordinates still use the live archive below.
+    if os.getenv("VERCEL"):
+        fallback = preset_frames().get(key)
+        if fallback is not None:
+            cp.write_text(json.dumps(fallback), encoding="utf-8")
+            return JSONResponse(fallback)
+
     # The CAOM plane table has the footprint polygon, so one spatial query + join returns
     # metadata and file paths together (~6 s, vs. obscore + per-ID lookups at 30 s+)
     try:
