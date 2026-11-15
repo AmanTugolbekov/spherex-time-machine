@@ -14,7 +14,7 @@ const DET_COLORS = { D1: "#8fb4ff", D2: "#6fc6ff", D3: "#55d2e8", D4: "#4fd9c2",
 const $ = (s) => document.querySelector(s);
 const state = {
   ra: null, dec: null, data: null, det: null, frames: [], a: null, b: null,
-  mode: "blink", timer: null, fov: 12, sso: {}, aiSignature: null,
+  mode: "blink", timer: null, fov: 12, sso: {}, aiSignature: null, demoTarget: null,
 };
 let aladin, marker;
 
@@ -51,22 +51,53 @@ function drawMarker() {
 function setTarget(ra, dec, load) {
   state.ra = (ra + 360) % 360;
   state.dec = dec;
+  state.demoTarget = nearestPreset(state.ra, state.dec);
   $("#target").textContent = `RA ${state.ra.toFixed(4)}°  Dec ${state.dec >= 0 ? "+" : ""}${state.dec.toFixed(4)}°`;
   drawMarker();
   if (load) loadFrames();
-  else status("New spot selected. Press “Load SPHEREx images here” to see it.", "hint");
+  else {
+    const p = state.demoTarget;
+    stopTimer();
+    document.querySelectorAll("#presets button").forEach((b) => b.classList.remove("active"));
+    $("#controls").hidden = true;
+    $("#stage").hidden = true;
+    $("#aiPanel").hidden = true;
+    $("#loadHere").textContent = `Open nearest: ${p.name}`;
+    $("#mapHint").textContent = `This exact map position is not guaranteed in demo mode. ${p.name} is the nearest verified target.`;
+    status(`Preview selected. Open ${p.name} for reliable SPHEREx data, or choose any verified target above.`, "hint");
+  }
 }
 
 // ------------------------------------------------------------------ presets & search
 const presetBox = $("#presets");
+
+function angularDistance(a, b) {
+  const rad = Math.PI / 180;
+  const dRa = ((a.ra - b.ra + 540) % 360 - 180) * rad;
+  const dDec = (a.dec - b.dec) * rad;
+  const meanDec = ((a.dec + b.dec) / 2) * rad;
+  return Math.sqrt((dRa * Math.cos(meanDec)) ** 2 + dDec ** 2) / rad;
+}
+
+function nearestPreset(ra, dec) {
+  const point = { ra, dec };
+  return PRESETS.reduce((best, p) => angularDistance(point, p) < angularDistance(point, best) ? p : best);
+}
+
+function openPreset(p) {
+  document.querySelectorAll("#presets button").forEach((b) => b.classList.toggle("active", b.dataset.name === p.name));
+  aladin?.gotoRaDec(p.ra, p.dec);
+  aladin?.setFoV(2);
+  $("#loadHere").textContent = "Reload this verified target";
+  $("#mapHint").textContent = `${p.name} is a verified demo target with packaged NASA metadata.`;
+  setTarget(p.ra, p.dec, true);
+}
+
 PRESETS.forEach((p) => {
   const b = document.createElement("button");
-  b.innerHTML = `${p.name}<small>${p.note}</small>`;
-  b.onclick = () => {
-    aladin?.gotoRaDec(p.ra, p.dec);
-    aladin?.setFoV(2);
-    setTarget(p.ra, p.dec, true);
-  };
+  b.dataset.name = p.name;
+  b.innerHTML = `<span class="verified-dot" aria-hidden="true"></span>${p.name}<small>${p.note}</small>`;
+  b.onclick = () => openPreset(p);
   presetBox.appendChild(b);
 });
 
@@ -93,7 +124,8 @@ $("#search").addEventListener("submit", (e) => {
     }
     aladin.gotoRaDec(ra, dec);
     aladin.setFoV(2);
-    return setTarget(ra, dec, true);
+    const exact = PRESETS.find((p) => angularDistance({ ra, dec }, p) < 0.05);
+    return exact ? openPreset(exact) : setTarget(ra, dec, false);
   }
   status(`Looking up “${q}”…`, "busy");
   fetch(`/api/resolve?name=${encodeURIComponent(q)}`)
@@ -101,7 +133,8 @@ $("#search").addEventListener("submit", (e) => {
     .then(({ ra, dec }) => {
       aladin.gotoRaDec(ra, dec);
       aladin.setFoV(2);
-      setTarget(ra, dec, true);
+      const exact = PRESETS.find((p) => angularDistance({ ra, dec }, p) < 0.05);
+      exact ? openPreset(exact) : setTarget(ra, dec, false);
     })
     .catch(() => status(`Could not find “${q}”. Try another name or RA Dec in degrees.`, "err"));
 });
@@ -111,7 +144,7 @@ $("#loadHere").onclick = () => {
     const [ra, dec] = aladin.getRaDec();
     setTarget(ra, dec, false);
   }
-  loadFrames();
+  openPreset(state.demoTarget || nearestPreset(state.ra, state.dec));
 };
 
 $("#helpBtn").onclick = () => $("#help").showModal();
